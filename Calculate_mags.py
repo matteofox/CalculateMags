@@ -1,5 +1,6 @@
 #Last edit 16/02/2022 MF
 
+
 import numpy as np
 import argparse
 import astropy.io.fits as fits
@@ -552,13 +553,31 @@ for ii in range(int(Nregions)):
    #  print 'WARNING WARNING min roll size'
    
    tmp_back = np.zeros(5000)
-   bkgmaskima = np.zeros_like(data)
+   tmpbkgmask = np.copy(tmpmask)
+   Nbkgpix_orig  = np.sum(tmpbkgmask*1.)
+   Nbkgpix_final = np.sum(tmpbkgmask*1.)
+   
+   FAIL=0
    
    for jj in range(500000):
           
      if cnt>=5000:
        break
      
+     if jj>5000 and cnt < 5 and FAIL==0:
+        
+        print('FAIL')
+        FAIL = 1
+        tmp_back = np.zeros(5000)
+        cnt=0
+        
+        tmpbkgmask *= 0
+        Nbkgsize = int((np.sqrt(Nbkgpix_orig))/2)
+        
+        tmpbkgmask[0:Nbkgsize,0:Nbkgsize] = 1
+
+        Nbkgpix_final = np.sum(tmpbkgmask*1.)
+        
      if (edges_ok[0]+roll_axis0[jj]<5) or (edges_ok[1]+roll_axis0[jj]>=size[0]-5) or (edges_ok[2]+roll_axis1[jj]<5) or (edges_ok[3]+roll_axis1[jj]>=size[1]-5):
        continue
 	     
@@ -567,17 +586,22 @@ for ii in range(int(Nregions)):
      tmpbadmask = TotBadMask[edges_ok[0]+roll_axis0[jj]:edges_ok[1]+roll_axis0[jj],edges_ok[2]+roll_axis1[jj]:edges_ok[3]+roll_axis1[jj]]
      
      #Verify this mask does not overlap with total mask or with bad stars or that there are nans
-     if ((tmptotmask+tmpbadmask)*tmpmask).sum() >0 or np.logical_not(np.isfinite(tmpdata[tmpmask==1])).sum() > 0:
+     if ((tmptotmask+tmpbadmask)*tmpbkgmask).sum() >0 or np.logical_not(np.isfinite(tmpdata[tmpbkgmask==1])).sum() > 0:
        continue
      
-     tmp_back[cnt] = np.nansum(tmpmask*tmpdata)
+     tmp_back[cnt] = np.nansum(tmpbkgmask*tmpdata)
      cnt +=1
      print(jj, cnt)
+   
    if cnt < 5000:
      Success[ii] = 0
      print("WARNING {0} {1}".format(ii+1, cnt))
    
+   #Now apply scaling if necessary
+   tmp_back = tmp_back/Nbkgpix_final*Nbkgpix_orig
+   
    #Now clean the signal
+   
    for rep in range(3):
      sigma = np.nanstd(tmp_back)
      mean = np.nanmean(tmp_back)
