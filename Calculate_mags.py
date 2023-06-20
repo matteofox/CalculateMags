@@ -1,4 +1,4 @@
-#Last edit 16/02/2022 MF
+#Last edit 20/06/2023 MF, FRD
 
 
 import numpy as np
@@ -65,8 +65,8 @@ class PyMask(object):
 
 def MW_extinction(lam):
   
-  anchor_points = np.array((1111,1176,1250,1316,1393,1490,1600,1701,1799,1901,2000,2101,2188,2299,2398,2500,2740,3436,4000,4405,5495,6993,9009,12500,16390,22200))
-  anchor_values = np.array((11.53,10.53,9.63,8.99,8.44,8.07,7.81,7.68,7.73,7.98,8.60,9.31,9.65,8.85,7.98,7.27,6.18,4.88,4.38,4.08,3.08,2.30,1.48,0.85,0.50,0.32))
+  anchor_points = np.array((1111,1176,1250,1316,1393,1490,1600,1701,1799,1901,2000,2101,2188,2299,2398,2500,2740,3436,4000,4405,5495,6993,9009,12500,16390,22200,27700,30000,35000,40000,45000))
+  anchor_values = np.array((11.53,10.53,9.63,8.99,8.44,8.07,7.81,7.68,7.73,7.98,8.60,9.31,9.65,8.85,7.98,7.27,6.18,4.88,4.38,4.08,3.08,2.30,1.48,0.85,0.50,0.32,0,0,0,0,0))
   interpolator = interp1d(anchor_points, anchor_values, kind='cubic')
   
   return interpolator(lam)
@@ -80,6 +80,7 @@ p.add_argument("IMAGE")
 p.add_argument("Regfile")
 p.add_argument("--StarsReg", default=None)
 p.add_argument("--AvoidExtReg", default=None)
+p.add_argument("--NoBkg", default=False, action='store_true')
 #p.add_argument("--ebv", default = 0.04639)
 p.add_argument("--ebv", default = 0.0092)
 p.add_argument("--outdir",   default = 'pyphotom/')
@@ -89,9 +90,12 @@ p.add_argument("--maxbkgoff", default=5, help="Max offset in multiples of the re
 
 args = p.parse_args()
 
+print(args.NoBkg)
+
 hdu1 = fits.open(args.IMAGE)
 
 data = hdu1[0].data
+
 
 
 OUTMAG = 0
@@ -308,7 +312,8 @@ if "JWST_f150w" in args.IMAGE:
   Wave_pivot = 1.501*1e4
   AG = args.ebv*MW_extinction(Wave_pivot) #2.545
   band = "JWST_f150w"
-  Exptime = hdu1[1].header['TEXPTIME']
+  Exptime = hdu1[0].header['TEXPTIME']
+  data = hdu1[1].data
   ZP = 28
   ZP_err = 0.05
   OUTMAG = 1
@@ -316,7 +321,8 @@ if "JWST_f200w" in args.IMAGE:
   Wave_pivot = 1.990*1e4
   AG = args.ebv*MW_extinction(Wave_pivot) #2.545
   band = "JWST_f200w"
-  Exptime = hdu1[1].header['TEXPTIME']
+  Exptime = hdu1[0].header['TEXPTIME']
+  data = hdu1[1].data
   ZP = 28
   ZP_err = 0.05
   OUTMAG = 1
@@ -324,7 +330,8 @@ if "JWST_f277w" in args.IMAGE:
   Wave_pivot = 2.786*1e4
   AG = args.ebv*MW_extinction(Wave_pivot) #2.545
   band = "JWST_f277w"
-  Exptime = hdu1[1].header['TEXPTIME']
+  Exptime = hdu1[0].header['TEXPTIME']
+  data = hdu1[1].data
   ZP = 26.47
   ZP_err = 0.05
   OUTMAG = 1
@@ -332,7 +339,8 @@ if "JWST_f356w" in args.IMAGE:
   Wave_pivot = 3.563*1e4
   AG = args.ebv*MW_extinction(Wave_pivot) #2.545
   band = "JWST_f356w"
-  Exptime = hdu1[1].header['TEXPTIME']
+  Exptime = hdu1[0].header['TEXPTIME']
+  data = hdu1[1].data
   ZP = 26.47
   ZP_err = 0.05
   OUTMAG = 1
@@ -340,7 +348,8 @@ if "JWST_f444w" in args.IMAGE:
   Wave_pivot = 4.421*1e4
   AG = args.ebv*MW_extinction(Wave_pivot) #2.545
   band = "JWST_f444w"
-  Exptime = hdu1[1].header['TEXPTIME']
+  Exptime = hdu1[0].header['TEXPTIME']
+  data = hdu1[1].data
   ZP = 26.47
   ZP_err = 0.05
   OUTMAG = 1
@@ -516,7 +525,8 @@ Background_sig = np.zeros((Nregions))
 Success        = np.ones((Nregions))
 
 #Now for each mask compute background levels and sigma by moving the mask around
-for ii in range(int(Nregions)):
+if args.NoBkg == False:
+  for ii in range(int(Nregions)):
    
    #Remove stars from apertures if any
    before = Masks[ii,:,:].sum()
@@ -591,7 +601,7 @@ for ii in range(int(Nregions)):
      
      tmp_back[cnt] = np.nansum(tmpbkgmask*tmpdata)
      cnt +=1
-     print(jj, cnt)
+     #print(jj, cnt)
    
    if cnt < 5000:
      Success[ii] = 0
@@ -618,6 +628,8 @@ for ii in range(int(Nregions)):
      import matplotlib.mlab as mlab
      #mp.plot(bins, mlab.normpdf(bins, mean, sigma), 'r-', linewidth=2)
      #mp.show()
+
+
 
 Flux = np.zeros(Nregions)
 Flux_err = np.zeros(Nregions)
